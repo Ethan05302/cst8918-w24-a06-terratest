@@ -1,13 +1,13 @@
 # Define the resource group
 resource "azurerm_resource_group" "rg" {
   name     = "${var.labelPrefix}-A05-RG"
-  location = var.region
+  location = "canadacentral"
 }
 
 # Define a public IP address
 resource "azurerm_public_ip" "webserver" {
   name                = "${var.labelPrefix}A05PublicIP"
-  location            = azurerm_resource_group.rg.location
+  location            = "canadacentral"
   resource_group_name = azurerm_resource_group.rg.name
   allocation_method   = "Dynamic"
 }
@@ -16,10 +16,9 @@ resource "azurerm_public_ip" "webserver" {
 resource "azurerm_virtual_network" "vnet" {
   name                = "${var.labelPrefix}A05Vnet"
   address_space       = ["10.0.0.0/16"]
-  location            = azurerm_resource_group.rg.location
+  location            = "canadacentral"
   resource_group_name = azurerm_resource_group.rg.name
 }
-
 
 # Define the subnet
 resource "azurerm_subnet" "webserver" {
@@ -31,8 +30,8 @@ resource "azurerm_subnet" "webserver" {
 
 # Define network security group and rules
 resource "azurerm_network_security_group" "webserver" {
-  name                = "${var.labelPrefix}A05SG" # mckennrA05SG
-  location            = azurerm_resource_group.rg.location
+  name                = "${var.labelPrefix}A05SG"
+  location            = "canadacentral"
   resource_group_name = azurerm_resource_group.rg.name
 
   security_rule {
@@ -63,8 +62,13 @@ resource "azurerm_network_security_group" "webserver" {
 # Define the network interface
 resource "azurerm_network_interface" "webserver" {
   name                = "${var.labelPrefix}A05Nic"
-  location            = azurerm_resource_group.rg.location
+  location            = "canadacentral"
   resource_group_name = azurerm_resource_group.rg.name
+
+  depends_on = [
+    azurerm_subnet.webserver,
+    azurerm_public_ip.webserver
+  ]
 
   ip_configuration {
     name                          = "${var.labelPrefix}A05NicConfig"
@@ -88,8 +92,7 @@ data "cloudinit_config" "init" {
   part {
     filename     = "init.sh"
     content_type = "text/x-shellscript"
-
-    content = file("${path.module}/init.sh")
+    content      = file("${path.module}/init.sh")
   }
 }
 
@@ -97,9 +100,14 @@ data "cloudinit_config" "init" {
 resource "azurerm_linux_virtual_machine" "webserver" {
   name                  = "${var.labelPrefix}A05VM"
   resource_group_name   = azurerm_resource_group.rg.name
-  location              = azurerm_resource_group.rg.location
+  location              = "canadacentral"
   network_interface_ids = [azurerm_network_interface.webserver.id]
   size                  = "Standard_B1s"
+
+  depends_on = [
+    azurerm_network_interface.webserver,
+    azurerm_network_interface_security_group_association.webserver
+  ]
 
   os_disk {
     name                 = "${var.labelPrefix}A05OSDisk"
@@ -114,7 +122,7 @@ resource "azurerm_linux_virtual_machine" "webserver" {
     version   = "latest"
   }
 
-  computer_name                   = "${var.labelPrefix}A05VM"
+  computer_name                    = "${var.labelPrefix}A05VM"
   admin_username                  = var.admin_username
   disable_password_authentication = true
 
